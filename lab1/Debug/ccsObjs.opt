@@ -1,0 +1,1 @@
+"./LED_on_off.obj" "./WriteLed.obj" "./main.obj" "../lnk_msp430f5529.cmd" -llibmath.a -llibc.a 
