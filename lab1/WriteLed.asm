@@ -3,6 +3,8 @@
 ; @file WriteLed.asm
 ; @brief Implementation of function used to write (0-F) to 7seg display
 ;
+; 4.1
+;
 ; @date 23.04.2021
 ; @author Andrea Ciric (andreaciric23@gmail.com)
 ;
@@ -101,7 +103,7 @@ WriteLed	bis.b	#0x48, &P2OUT			; deaktivirnje segmenata c i e na portu 2
 			bis.b	#0x09, &P4OUT			; deaktivirnje segmenata b i f na portu 4
 			bic.b	segtab_p4(R10), &P4OUT	; indeksiranje tabele segmenata i ispis na displej
 
-			bis.b	#0x06, &P8OUT			; deaktivirnje segmenata c i e na portu 2
+			bis.b	#0x06, &P8OUT			; deaktivirnje segmenata d i g na portu 8
 			bic.b	segtab_p8(R10), &P8OUT	; indeksiranje tabele segmenata i ispis na displej
 
 			;jmp 	lab						; skok na labelu za potrebe debugovanja/simulacije

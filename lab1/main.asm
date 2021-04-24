@@ -1,13 +1,15 @@
 ;-----------------------------------------------------------------------------------
 ;
 ; @file main.asm
-; @brief In this example everytime S3 button is presssed value stored in register R10
-; gets incremented and LED3 changes value. Everytime S4 button is presssed value
+; @brief In this example everytime S3 button is presssed value stored in register
+; R10 gets incremented and LED3 changes value. Everytime S4 button is presssed value
 ; stored in register R10 gets decremented and LED4 changes value.
 ; Value stored in R10 is diplayed on a sevenseg display.
-; Button press is detected using interrupt.
+; S3 and S4 button press is detected using interrupt.
 ;
-; 4.1, 4.4 i 4.5
+; Also, while button S1 is pressed, LED1 is turned on and while S2 is pressed,
+; LED2 is on.
+;
 ;
 ; @date 23.04.2021
 ; @author Andrea Ciric (andreaciric23@gmail.com)
@@ -66,7 +68,7 @@ setup:		bis.b	#0x48, &P2DIR			; P2.3 i P2.6 -> output
 			bis.b	#BIT5, &P1OUT			; P1.5 -> pull-up
 
 			bic.b	#BIT5, &P1IFG			; inicijalno brisanje flega prekida
-			bis.b	#BIT5, &P1IE			; dozvola prekida na P1.4
+			bis.b	#BIT5, &P1IE			; dozvola prekida na P1.5
 			bis.b	#BIT5, &P1IES			; opadajuca ivica generise prekid
 
 			; LED4
