@@ -1,12 +1,11 @@
 /**
  * @file main.c
- * @brief Demo Timer multiplex
+ * @brief Timer multiplex
  *
- * In this example number 12 is displayed on multiplexed 7 segment LED display
+ * In this example number defined in NUMBER is displayed on multiplexed 7 segment LED display
  *
- * @date 2021
- * @author  Marija Bezulj [meja@etf.bg.ac.rs]
- * @modifiedBy Andrea Ciric
+ * @date 06.05.2021.
+ * @author Andrea Ciric (andreaciric23@gmail.com)
  *
  */
 
@@ -38,8 +37,6 @@ volatile  uint8_t current_digit = 0;
 
 /**
  * @brief Function that extracts digits from number
- * @author Strahinja Jankovic
- * @modifiedBy Andrea Ciric
  */
 void display(const uint16_t number)
 {
@@ -73,7 +70,7 @@ void display(const uint16_t number)
 /**
  * @brief Main function
  * Initialize the 7seg display and timer in compare mode.
- * ISR will multiplex the display
+ * ISR in asm will multiplex the display
  */
 int main(void)
 {
@@ -103,4 +100,3 @@ int main(void)
 
     while(1);
 }
-

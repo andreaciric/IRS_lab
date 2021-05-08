@@ -122,34 +122,34 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXE_OUTPUTS += \
-lab2win.out \
+lab_glavni.out \
 
 EXE_OUTPUTS__QUOTED += \
-"lab2win.out" \
+"lab_glavni.out" \
 
 BIN_OUTPUTS += \
-lab2win.hex \
+lab_glavni.hex \
 
 BIN_OUTPUTS__QUOTED += \
-"lab2win.hex" \
+"lab_glavni.hex" \
 
 
 # All Target
 all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
-	@$(MAKE) --no-print-directory -Onone "lab2win.out"
+	@$(MAKE) --no-print-directory -Onone "lab_glavni.out"
 
 # Tool invocations
-lab2win.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
+lab_glavni.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: "$@"'
 	@echo 'Invoking: MSP430 Linker'
-	"C:/ti/ccs1031/ccs/tools/compiler/ti-cgt-msp430_20.2.4.LTS/bin/cl430" -vmspx --data_model=restricted --use_hw_mpy=F5 --advice:power=all --define=__MSP430F5529__ -g --printf_support=minimal --diag_warning=225 --diag_wrap=off --display_error_number --silicon_errata=CPU21 --silicon_errata=CPU22 --silicon_errata=CPU23 --silicon_errata=CPU40 -z -m"lab2win.map" --heap_size=160 --stack_size=160 --cinit_hold_wdt=on -i"C:/ti/ccs1031/ccs/ccs_base/msp430/include" -i"C:/ti/ccs1031/ccs/ccs_base/msp430/lib/5xx_6xx_FRxx" -i"C:/ti/ccs1031/ccs/tools/compiler/ti-cgt-msp430_20.2.4.LTS/lib" -i"C:/ti/ccs1031/ccs/tools/compiler/ti-cgt-msp430_20.2.4.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="lab2win_linkInfo.xml" --use_hw_mpy=F5 --rom_model -o "lab2win.out" $(ORDERED_OBJS)
+	"C:/ti/ccs1031/ccs/tools/compiler/ti-cgt-msp430_20.2.4.LTS/bin/cl430" -vmspx --data_model=restricted --use_hw_mpy=F5 --advice:power=all --define=__MSP430F5529__ -g --printf_support=minimal --diag_warning=225 --diag_wrap=off --display_error_number --silicon_errata=CPU21 --silicon_errata=CPU22 --silicon_errata=CPU23 --silicon_errata=CPU40 -z -m"lab_glavni.map" --heap_size=160 --stack_size=160 --cinit_hold_wdt=on -i"C:/ti/ccs1031/ccs/ccs_base/msp430/include" -i"C:/ti/ccs1031/ccs/ccs_base/msp430/lib/5xx_6xx_FRxx" -i"C:/ti/ccs1031/ccs/tools/compiler/ti-cgt-msp430_20.2.4.LTS/lib" -i"C:/ti/ccs1031/ccs/tools/compiler/ti-cgt-msp430_20.2.4.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="lab_glavni_linkInfo.xml" --use_hw_mpy=F5 --rom_model -o "lab_glavni.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
 
-lab2win.hex: $(EXE_OUTPUTS)
+lab_glavni.hex: $(EXE_OUTPUTS)
 	@echo 'Building secondary target: "$@"'
 	@echo 'Invoking: MSP430 Hex Utility'
-	"C:/ti/ccs1031/ccs/tools/compiler/ti-cgt-msp430_20.2.4.LTS/bin/hex430" --memwidth=8 --romwidth=8 --diag_wrap=off -o "lab2win.hex" $(EXE_OUTPUTS__QUOTED)
+	"C:/ti/ccs1031/ccs/tools/compiler/ti-cgt-msp430_20.2.4.LTS/bin/hex430" --memwidth=8 --romwidth=8 --diag_wrap=off -o "lab_glavni.hex" $(EXE_OUTPUTS__QUOTED)
 	@echo 'Finished building secondary target: "$@"'
 	@echo ' '
 

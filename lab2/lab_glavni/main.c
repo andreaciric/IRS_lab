@@ -1,12 +1,14 @@
 /**
  * @file main.c
- * @brief Demo Timer multiplex
+ * @brief Exchanging data with computer using UART communication.
+ * Data received in a package (in the form of 's'XY't', X and Y being digits 0-9) is shown on the 2 7-seg displays.
+ * Received data is "echoed back" to Tx.
  *
- * In this example number 12 is displayed on multiplexed 7 segment LED display
  *
- * @date 2021
- * @author  Marija Bezulj [meja@etf.bg.ac.rs]
- * @modifiedBy Andrea Ciric
+ * @date 08.05.2021.
+ * @author  Andrea Ciric (andreaciric23@gmail.com)
+ *
+ * @version [1.0 - 05/2021] Initial version for MSP430F5529
  *
  */
 
@@ -16,7 +18,7 @@
 
 
 /**
- * @brief Timer period
+ * @brief Timer period for 2 7-seg displays mux
  *
  * Timer is clocked by ACLK (32768Hz)
  * It takes 32768 cycles to rx_cnt to 1s.
@@ -26,40 +28,25 @@
  */
 #define TIMER_PERIOD        (163)  /* ~5ms (4.97ms)  */
 
-/**
- * @brief Number to be displayed
- */
-#define NUMBER          (23)
+#define ASCII2DIGIT(x)      (x - '0')   // macro to convert ASCII code to digit
+#define DIGIT2ASCII(x)      (x + '0')   // macro to convert digit to ASCII code
 
-/** macro to convert ASCII code to digit */
-#define ASCII2DIGIT(x)      (x - '0')
-/** macro to convert digit to ASCII code */
-#define DIGIT2ASCII(x)      (x + '0')
+//#define NUMBER          (23)          // Number to be displayed in 5.1
 
-/** variable where received character is placed */
-volatile uint8_t data = 0;
+//volatile uint8_t data = 0;            // variable where received character in 5.3 is placed
 
-/** variable where data received in Rx is saved */
-volatile uint8_t temp = 0;
+volatile uint8_t disp2, disp1;          // digits used for display (order: [disp2 disp1])
+volatile uint8_t temp = 0;              // variable where data received in Rx is saved
 
-volatile uint8_t rx_cnt = 0;
-volatile uint8_t tx_cnt = 0;
+volatile uint8_t rx_cnt = 0;            // variable for counting data received
+volatile uint8_t tx_cnt = 0;            // variable for counting data sent
 
-/** variable where two digits received in 5.4 are placed */
-volatile uint8_t digits[2];
+volatile uint8_t digits[2];             // variable where two digits received from rx are placed
+volatile uint8_t PCK_ARRIVED = 0;       // flag that says if packet has arrived
 
-/** flag that says if packet has arrived */
-volatile uint8_t PCK_ARRIVED = 0;
-
-/**
- * @brief digits used for display [disp2 disp1]
- */
-volatile uint8_t disp2, disp1;
 
 /**
  * @brief Function that extracts digits from number
- * @author Strahinja Jankovic
- * @modifiedBy Andrea Ciric
  */
 void display(const uint16_t number)
 {
@@ -87,13 +74,10 @@ void display(const uint16_t number)
 
     disp2 = data[1];
     disp1 = data[0];
-
 }
 
 /**
  * @brief Main function
- * Initialize the 7seg display and timer in compare mode.
- * ISR will multiplex the display
  */
 int main(void)
 {
@@ -117,7 +101,7 @@ int main(void)
     TA1CTL = TASSEL__ACLK | MC__UP; //clock select and up mode
 
     // create BCD digits
-    display(NUMBER);
+    //display(NUMBER);
 
     // initialize USCI UART A1
     P4SEL |= BIT4 | BIT5;           // select P4.4 and P4.5 for USCI
@@ -132,14 +116,14 @@ int main(void)
 
     UCA1CTL1 &= ~UCSWRST;           // release reset
 
-    UCA1IE |= UCRXIE + UCTXIE;               // enable RX interrupt
+    UCA1IE |= UCRXIE + UCTXIE;      // enable RX interrupt
 
     __enable_interrupt();           // GIE
 
     while(1)
     {
-        if (PCK_ARRIVED == 1)
-        {
+        if (PCK_ARRIVED == 1)       // if pck arrived send first char to Tx
+        {                           // remaining chars are sent through ISR
             PCK_ARRIVED = 0;
             tx_cnt = 1;
             UCA1TXBUF = 's';
@@ -150,7 +134,8 @@ int main(void)
 /**
  * @brief USCIA1 ISR
  *
- * When data is received using UART, save it and display on 7seg display
+ * When data is received using UART in the form of 's'XY't', save it,
+ * display it on 7seg display and echo it back to Tx.
  */
 void __attribute__ ((interrupt(USCI_A1_VECTOR))) UARTISR (void)
 {
@@ -158,46 +143,45 @@ void __attribute__ ((interrupt(USCI_A1_VECTOR))) UARTISR (void)
     {
     case 0:
         break;
-    case USCI_UCRXIFG:
+    case USCI_UCRXIFG:                      // on Rx interrupt flag do:
         //5.3
         //data = ASCII2DIGIT(UCA1RXBUF);    // save data
         //display(UCA1RXBUF);               // write to 7seg
 
-        //5.4
         temp = UCA1RXBUF;
-        if ((temp == 0x73) && (rx_cnt == 0))
+        if ((temp == 0x73) && (rx_cnt == 0))        // wait for 's' to be received
             rx_cnt++;
-        else if ((rx_cnt >= 1) && (rx_cnt < 3))
+        else if ((rx_cnt >= 1) && (rx_cnt < 3))     // save next two chars
         {
             digits[rx_cnt - 1] = temp;
             rx_cnt++;
         }
         else if (rx_cnt == 3)
         {
-            if (temp == 0x74)
+            if (temp == 0x74)                       // check if 4th char is 't'
             {
-                disp2 = ASCII2DIGIT(digits[0]);
+                disp2 = ASCII2DIGIT(digits[0]);     // if yes display it
                 disp1 = ASCII2DIGIT(digits[1]);
-                PCK_ARRIVED = 1;
+                PCK_ARRIVED = 1;                    // notify that pck arrived
             }
-            rx_cnt = 0;
+            rx_cnt = 0;                             // else reset the counter
         }
         break;
-    case USCI_UCTXIFG:
-        if (tx_cnt == 1)
+    case USCI_UCTXIFG:                      // on Tx interrupt flag do:
+        if (tx_cnt == 1)                    // send 2nd char (first one was sent in the main function)
         {
             UCA1TXBUF = digits[0];
             tx_cnt++;
         }
-        else if (tx_cnt == 2)
+        else if (tx_cnt == 2)               // send 3rd char
         {
             UCA1TXBUF = digits[1];
             tx_cnt++;
         }
-        else if (tx_cnt == 3)
+        else if (tx_cnt == 3)               // send 4th char
         {
             UCA1TXBUF = 't';
-            tx_cnt = 0;
+            tx_cnt = 0;                     // reset counter
         }
         break;
     }
