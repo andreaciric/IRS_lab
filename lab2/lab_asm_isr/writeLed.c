@@ -1,6 +1,6 @@
 /**
  * @file writeLed.c
- * @brief Implementation of function used to write (0-F) to 7seg display
+ * @brief Implementation of function used to write (0-9) to 7seg display
  *
  *
  * @date 06.05.2021.

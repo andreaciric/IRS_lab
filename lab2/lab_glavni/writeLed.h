@@ -1,10 +1,14 @@
-/*
- * function.h
- * @brief Declaration of function used to write to 7seg display
+/**
+ * @file writeLed.h
+ * @brief Decleration of function used to write (0-9) to 7seg display
  *
- *  Created on: May 6, 2021
- *      Author: Andrea
- */
+ *
+ * @date 06.05.2021.
+ * @author Andrea Ciric (andreaciric23@gmail.com)
+ *
+ * @version [1.0 - 04/2021] Initial version
+ *
+ **/
 
 #ifndef FUNCTION_H_
 #define FUNCTION_H_

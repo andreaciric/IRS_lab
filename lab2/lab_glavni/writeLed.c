@@ -1,9 +1,14 @@
-/*
- * function.c
+/**
+ * @file writeLed.c
+ * @brief Implementation of function used to write (0-9) to 7seg display
  *
- *  Created on: May 6, 2021
- *      Author: Anja
- */
+ *
+ * @date 06.05.2021.
+ * @author Andrea Ciric (andreaciric23@gmail.com)
+ *
+ * @version [1.0 - 04/2021] Initial version
+ *
+ **/
 
 #include <msp430.h>
 #include <writeLed.h>
