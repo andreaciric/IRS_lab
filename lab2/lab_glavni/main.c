@@ -19,7 +19,7 @@
  * @brief Timer period
  *
  * Timer is clocked by ACLK (32768Hz)
- * It takes 32768 cycles to count to 1s.
+ * It takes 32768 cycles to rx_cnt to 1s.
  * If we need a period of X ms, then number of cycles
  * that is written to the CCR0 register is
  * 32768/1000 * X
@@ -39,6 +39,18 @@
 /** variable where received character is placed */
 volatile uint8_t data = 0;
 
+/** variable where data received in Rx is saved */
+volatile uint8_t temp = 0;
+
+volatile uint8_t rx_cnt = 0;
+volatile uint8_t tx_cnt = 0;
+
+/** variable where two digits received in 5.4 are placed */
+volatile uint8_t digits[2];
+
+/** flag that says if packet has arrived */
+volatile uint8_t PCK_ARRIVED = 0;
+
 /**
  * @brief digits used for display [disp2 disp1]
  */
@@ -56,9 +68,9 @@ void display(const uint16_t number)
 
     //double dabble
     uint8_t data[2] = {0};
-    int8_t count;
+    int8_t rx_cnt;
 
-    for (count = 7; count >= 0; count--)
+    for (rx_cnt = 7; rx_cnt >= 0; rx_cnt--)
     {
         uint8_t next = (nr & BIT7) ? 1 : 0;
         nr <<= 1;
@@ -108,23 +120,31 @@ int main(void)
     display(NUMBER);
 
     // initialize USCI UART A1
-    P4SEL |= BIT4 | BIT5;       // select P4.4 and P4.5 for USCI
+    P4SEL |= BIT4 | BIT5;           // select P4.4 and P4.5 for USCI
 
-    UCA1CTL1 |= UCSWRST;        // put USCI in reset
+    UCA1CTL1 |= UCSWRST;            // put USCI in reset
 
-    UCA1CTL0 = 0;               // no parity, 8bit, 1 stop bit
-    UCA1CTL1 |= UCSSEL__SMCLK;   // use MCLK ~1MHz
-    UCA1BR0 = 52;               // 52 < 2^8 = 256
+    UCA1CTL0 = 0;                   // no parity, 8bit, 1 stop bit
+    UCA1CTL1 |= UCSSEL__SMCLK;      // use SMCLK ~1048576Hz
+    UCA1BR0 = 54;                   // 52 < 2^8 = 256
     UCA1BR1 = 0;
-    UCA1MCTL = 0;               // BRS = 0 & BRF = 0
+    UCA1MCTL |= UCBRS_5 + UCBRF_0;  // BRS = 5 & BRF = 0
 
-    UCA1CTL1 &= ~UCSWRST;       // release reset
+    UCA1CTL1 &= ~UCSWRST;           // release reset
 
-    UCA1IE |= UCRXIE;           // enable RX interrupt
+    UCA1IE |= UCRXIE + UCTXIE;               // enable RX interrupt
 
-    __enable_interrupt();       // GIE
+    __enable_interrupt();           // GIE
 
-    while(1);
+    while(1)
+    {
+        if (PCK_ARRIVED == 1)
+        {
+            PCK_ARRIVED = 0;
+            tx_cnt = 1;
+            UCA1TXBUF = 's';
+        }
+    }
 }
 
 /**
@@ -134,11 +154,52 @@ int main(void)
  */
 void __attribute__ ((interrupt(USCI_A1_VECTOR))) UARTISR (void)
 {
-    if (UCA1IV == USCI_UCRXIFG)
+    switch (UCA1IV)
     {
-        data = ASCII2DIGIT(UCA1RXBUF);  // save data
-        //display(UCA1RXBUF);     // write to 7seg
-        WriteLed(data);
+    case 0:
+        break;
+    case USCI_UCRXIFG:
+        //5.3
+        //data = ASCII2DIGIT(UCA1RXBUF);    // save data
+        //display(UCA1RXBUF);               // write to 7seg
+
+        //5.4
+        temp = UCA1RXBUF;
+        if ((temp == 0x73) && (rx_cnt == 0))
+            rx_cnt++;
+        else if ((rx_cnt >= 1) && (rx_cnt < 3))
+        {
+            digits[rx_cnt - 1] = temp;
+            rx_cnt++;
+        }
+        else if (rx_cnt == 3)
+        {
+            if (temp == 0x74)
+            {
+                disp2 = ASCII2DIGIT(digits[0]);
+                disp1 = ASCII2DIGIT(digits[1]);
+                PCK_ARRIVED = 1;
+            }
+            rx_cnt = 0;
+        }
+        break;
+    case USCI_UCTXIFG:
+        if (tx_cnt == 1)
+        {
+            UCA1TXBUF = digits[0];
+            tx_cnt++;
+        }
+        else if (tx_cnt == 2)
+        {
+            UCA1TXBUF = digits[1];
+            tx_cnt++;
+        }
+        else if (tx_cnt == 3)
+        {
+            UCA1TXBUF = 't';
+            tx_cnt = 0;
+        }
+        break;
     }
 }
 
@@ -173,4 +234,3 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) CCR0ISR (void)
 
     return;
 }
-
