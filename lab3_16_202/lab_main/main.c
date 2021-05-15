@@ -1,22 +1,25 @@
 /**
  * @file main.c
- * @brief Demo ADC12 single conversion on button press
+ * @brief ADC, PWM and UART
  *
- * Press of a button initiates conversion on channel A0
- * of ADC12, which is connected to a potentiometer.
- * Result of the conversion is sent through USCI to PC.
+ * Timer B0 periodically (16Hz) triggers the conversion
+ * on channel A0 of ADC12, which is connected to a potentiometer.
+ * 8 greater bits from 12 bits of the conversion result are sent
+ * using UART to PC everytime PC sends 's' (0x73) and at the same
+ * time defining the duty cycle of PWM on TA0CCR2 OUT. On every 's'
+ * PWM duty cycle gets inverted.
  *
- * @date 2021
- * @author Marija Bezulj (meja@etf.bg.ac.rs)
+ * @date 15.05.2021.
+ * @author  Andrea Ciric (andreaciric23@gmail.com)
  *
- * @version [1.0 @ 05/2021] Initial version
+ * @version [1.0 - 05/2021] Initial version for MSP430F5529
+ *
  */
 #include <msp430.h> 
 #include <stdint.h>
 
-#define BR9600      (109)
-
-#define BRS9600      (UCBRS_2)
+#define BR9600      (3)         //ACLK
+#define BRS9600      (UCBRS_3)  //ACLK
 
 /**
  * @brief Timer period for ADC12 conversion triggering
@@ -25,7 +28,7 @@
  * No divider is set.
  * We want 16Hz frequency, so use 2048 for CCR1
  */
-#define CONV_PERIOD        (2048)  /* 500ms */
+#define CONV_PERIOD        (2048)  /* ~62.5 ms */
 
 /*
  * Timer is clocked by ACLK (32768Hz)
@@ -41,11 +44,10 @@
  */
 #define TIMER_PERIOD        (163)  /* ~5ms (4.97ms) */
 
-/** variable where conversion result is placed */
-volatile unsigned int ad_result = 0;
 
-/** variable where duty cycle is placed */
-volatile uint16_t dutyclc = 0;
+volatile unsigned int ad_result = 0;        // variable where conversion result is placed
+volatile uint16_t dutyclc = 0;              // variable where duty cycle is placed
+volatile uint8_t temp = 0;                  // variable where data received in Rx is saved
 
 /**
  * @brief Main function
@@ -63,24 +65,14 @@ int main(void)
     UCA1CTL1 |= UCSWRST;            // set software reset
 
     UCA1CTL0 = 0;                   // no parity, 8bit, 1 stop bit
-    UCA1CTL1 |= UCSSEL__SMCLK;      // use SMCLK = 1 048 576 Hz
-    UCA1BRW = BR9600;               // BR = 109
-    UCA1MCTL |=BRS9600 + UCBRF_0;   // BRS = 2 for 9600 bps
+    UCA1CTL1 |= UCSSEL__ACLK;       // use ACLK = 32 768 Hz
+    UCA1BRW = BR9600;               // BR = 3
+    UCA1MCTL |= BRS9600 + UCBRF_0;   // BRS = 3 for 9600 bps
 
     UCA1CTL1 &= ~UCSWRST;           // release software reset
 
-    // configure button S1
-    P1REN |= BIT4;              // enable pull up/down
-    P1OUT |= BIT4;              // set pull up
-    P1DIR &= ~BIT4;             // configure P1.4 as in
-    P1IES |= BIT4;              // interrupt on falling edge
-    P1IFG &= ~BIT4;             // clear flag
-    P1IE  |= BIT4;              // enable interrupt
+    UCA1IE |= UCRXIE | UCTXIE;      // enable RX and TX interrupt
 
-    /* initialize Timer A1 */
-    //TA1CCR0 = TIMER_PERIOD;     // debounce period
-    //TA1CCTL0 |= CCIE;           // enable CCR0 interrupt
-    //TA1CTL |= TASSEL__ACLK;
 
     /* REF module */
     REFCTL0 &= ~REFMSTR;        // ref system controlled by legacy control bits inside ADC12_A
@@ -91,9 +83,9 @@ int main(void)
     ADC12CTL0 &= ~ADC12ENC;     // disable ADC before configuring
     /* 32 cycles for sampling, ref voltage is set by ADC12_A, ADC ON */
     ADC12CTL0 |= ADC12SHT0_3 + ADC12REF2_5V + ADC12ON;
-    ADC12CTL1 |= ADC12CSTARTADD_0 + ADC12SHS_2 + ADC12SHP + ADC12SSEL_0 + ADC12CONSEQ_2;  // start address ADC12MEM0, SC starts conversion
-                                                                             // single channel single conversion, MODCLK clock
-                                                                             // SAMPCON sourced from the sampling timer ?
+    ADC12CTL1 |= ADC12CSTARTADD_0 + ADC12SHS_2 + ADC12SHP + ADC12SSEL_0 + ADC12CONSEQ_2; // start address ADC12MEM0, timer starts conversion
+                                                                                         // single channel single conversion, MODCLK clock
+                                                                                         // SAMPCON sourced from the sampling timer
     ADC12CTL2 |= ADC12RES_2;    // 12 bit conversion result
     ADC12MCTL0 |= ADC12INCH_0;  // reference AVCC and AVSS, channel A0
 
@@ -124,7 +116,7 @@ int main(void)
     TA0CTL = TASSEL__ACLK | MC__UP;
 
 
-    __enable_interrupt();           // GIE
+    __enable_interrupt();       // GIE
 
     while(1){
     }
@@ -143,10 +135,6 @@ void __attribute__ ((interrupt(ADC12_VECTOR))) ADC12ISR (void)
         // change TA0CCR2 duty cycle on the run, timer stop not needed
 
         ad_result = ADC12MEM0;
-        UCA1TXBUF = ad_result;
-
-        //data = ADC12MEM0 & 0xff;
-        //ndrf = 1;
         dutyclc = (ad_result & 0xfff) * (PWM_PERIOD/0xfff);
         TA0CCR2 = dutyclc;
         break;
@@ -156,37 +144,28 @@ void __attribute__ ((interrupt(ADC12_VECTOR))) ADC12ISR (void)
 }
 
 /**
- * @brief PORT1 ISR
- *
- * On button press send data using UART
+ * @brief USCI UART ISR
  */
-//void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
-//{
-//   if ((P1IFG & BIT4) != 0)        // check if P1.4 flag is set
-//    {
-//        /* start timer */
-//        TA1CTL |= MC__UP;
-//
-//        P1IFG &= ~BIT4;             // clear P1.4 flag
-//        P1IE &= ~BIT4;              // disable P1.4 interrupt
-//    }
-//}
-
-
-/**
- * @brief TIMERA0 Interrupt service routine
- *
- * ISR debounces P1.4 and starts ADC12 single conversion
- */
-//void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) CCR0ISR (void)
-//{
-//    if ((P1IN & BIT4) == 0) // check if button is still pressed
-//    {
-//        ADC12CTL0 |= ADC12SC;  // start ADC12 conversion
-//    }
-//    TA1CTL &= ~(MC0 | MC1); // stop and clear timer
-//    TA1CTL |= TACLR;
-//    P1IFG &= ~BIT4;         // clear P1.4 flag
-//    P1IE |= BIT4;           // enable P1.4 interrupt
-//    return;
-//}
+void __attribute__ ((interrupt(USCI_A1_VECTOR))) UARTISR (void)
+{
+    switch (UCA1IV)
+    {
+    case 0:
+        break;
+    case USCI_UCRXIFG:                      // on Rx interrupt flag do:
+        temp = UCA1RXBUF;                   // store Rx value when interrupt happens
+        if (temp == 0x73)                   // wait for 's' to be received
+        {
+            UCA1TXBUF = ad_result >> 4;
+            // change TA0CCTL2 output mode on the run, timer stop not needed
+            /* A safe method for switching between output modes is to
+                use output mode 7 as a transition state => as we are already operating
+                with mode 7 it is fine (S/R -> 011b, R/S -> 111b)*/
+            TA0CCTL2 ^= OUTMOD_4;           // 011 xor 100 -> 111 xor 100 -> 011...
+        }
+        break;
+    case USCI_UCTXIFG:                      // on Tx interrupt flag do:
+        /* UCTXIFG is automatically reset if a character is written to UCAxTXBUF. */
+        break;
+    }
+}

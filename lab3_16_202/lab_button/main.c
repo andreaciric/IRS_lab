@@ -1,22 +1,19 @@
 /**
  * @file main.c
- * @brief Demo ADC12 single conversion on button press
+ * @brief ADC12 single conversion on button press
  *
  * Press of a button initiates conversion on channel A0
  * of ADC12, which is connected to a potentiometer.
- * Result of the conversion is sent through USCI to PC.
+ * Result of the conversion is written into ad_result variable
+ * and it defines the duty cycle of PWM on TA0CCR2 OUT.
  *
- * @date 2021
- * @author Marija Bezulj (meja@etf.bg.ac.rs)
+ * @date 15.05.2021.
+ * @author  Andrea Ciric (andreaciric23@gmail.com)
  *
- * @version [1.0 @ 05/2021] Initial version
+ * @version [1.0 - 05/2021] Initial version for MSP430F5529
  */
 #include <msp430.h> 
 #include <stdint.h>
-
-#define BR9600      (109)
-
-#define BRS9600      (UCBRS_2)
 
 /*
  * Timer is clocked by ACLK (32768Hz)
@@ -32,33 +29,15 @@
  */
 #define TIMER_PERIOD        (163)  /* ~5ms (4.97ms) */
 
-/** variable where conversion result is placed */
-volatile unsigned int ad_result = 0;
-
-/** variable where duty cycle is placed */
-volatile uint16_t dutyclc = 0;
+volatile unsigned int ad_result = 0;        // variable where conversion result is placed
+volatile uint16_t dutyclc = 0;              // variable where duty cycle is placed
 
 /**
  * @brief Main function
- *
- * Peripheral initialization. USCI_A1 is used in UART mode
- * for transfer of ADC12 conversion result.
  */
 int main(void)
 {
     WDTCTL = WDTPW | WDTHOLD;       // Stop watchdog timer
-
-    // Initialize UART
-    P4SEL |= BIT4 | BIT5;           // enable P4.4 and P4.5 for UART
-
-    UCA1CTL1 |= UCSWRST;            // set software reset
-
-    UCA1CTL0 = 0;                   // no parity, 8bit, 1 stop bit
-    UCA1CTL1 |= UCSSEL__SMCLK;      // use SMCLK = 1 048 576 Hz
-    UCA1BRW = BR9600;               // BR = 109
-    UCA1MCTL |=BRS9600 + UCBRF_0;   // BRS = 2 for 9600 bps
-
-    UCA1CTL1 &= ~UCSWRST;           // release software reset
 
     // configure button S1
     P1REN |= BIT4;              // enable pull up/down
@@ -95,7 +74,7 @@ int main(void)
 
     /* init timerA0 with PWM out on LD2 through TA0 CCR2 */
 
-    TA0CCR0 = PWM_PERIOD - 1;       // init pwm period
+    TA0CCR0 = PWM_PERIOD - 1;   // init pwm period
     // timer is in compare mode with active OUT signa
     TA0CCR2 = dutyclc;          // initial state is no pulse
     TA0CCTL2 = OUTMOD_7;        // outmode is Reset/Set
@@ -126,10 +105,6 @@ void __attribute__ ((interrupt(ADC12_VECTOR))) ADC12ISR (void)
         // change TA0CCR2 duty cycle on the run, timer stop not needed
 
         ad_result = ADC12MEM0;
-        UCA1TXBUF = ad_result;
-
-        //data = ADC12MEM0 & 0xff;
-        //ndrf = 1;
         dutyclc = (ad_result & 0xfff) * (PWM_PERIOD/0xfff);
         TA0CCR2 = dutyclc;
         break;
@@ -141,8 +116,6 @@ void __attribute__ ((interrupt(ADC12_VECTOR))) ADC12ISR (void)
 
 /**
  * @brief PORT1 ISR
- *
- * On button press send data using UART
  */
 void __attribute__ ((interrupt(PORT1_VECTOR))) P1ISR (void)
 {
